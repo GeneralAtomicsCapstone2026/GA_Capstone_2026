@@ -3,6 +3,8 @@ name: Development security
 on:
   push:
     branches-ignore: [main]
+  pull_request:
+    branches: [main, python-comms-demo]
   workflow_dispatch:
 
 permissions:
