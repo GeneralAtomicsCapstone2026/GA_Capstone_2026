@@ -1,0 +1,1291 @@
+00:02 so let me talk just a little bit about
+00:04 
+
+00:04 program number two sort of an intro and
+00:07 
+
+00:07 then the problem is I can't go into much
+00:09 
+
+00:09 detail until you watch those videos
+00:11 
+
+00:11 really and so I'll go in a little bit
+00:13 
+
+00:13 more detail on Thursday but you know if
+00:15 
+
+00:15 you haven't watched the videos this is
+00:16 
+
+00:16 going to be completely meaningless to
+00:18 
+
+00:18 you because um okay what are we doing in
+00:21 
+
+00:21 program
+00:22 
+
+00:22 two we're going to write a
+00:28 
+
+00:28 server it's a chat program so first of
+00:30 
+
+00:30 all it's a chat program so we're g to
+00:32 
+
+00:32 have a server and then we're gonna
+00:34 
+
+00:34 you're going to write a client code and
+00:37 
+
+00:37 your server needs to be able to process
+00:39 
+
+00:39 n clients where n is some number and
+00:42 
+
+00:42 it's not fixed so you're going to be
+00:44 
+
+00:44 able to send a message to the server
+00:46 
+
+00:46 it's going to the server will have
+00:48 
+
+00:48 something called a handle
+00:50 
+
+00:50 table which you have to
+00:53 
+
+00:53 create and the handle table will map you
+00:56 
+
+00:56 know the uh the user's handle you pass
+00:59 
+
+00:59 the handle in on the command line and
+01:00 
+
+01:00 that gets sent to the server so maybe
+01:02 
+
+01:02 test one test two or your name or
+01:04 
+
+01:04 whatever it is but that's how you're
+01:05 
+
+01:05 identified to the system so that if this
+01:08 
+
+01:08 person wants to talk to you and you use
+01:10 
+
+01:10 test two as your name over here it would
+01:12 
+
+01:12 then send a message to test two and the
+01:14 
+
+01:14 handle table is then going to look it up
+01:16 
+
+01:16 which would be the handle
+01:19 
+
+01:19 name and the socket
+01:21 
+
+01:21 number and you don't know what socket
+01:23 
+
+01:23 number is if you haven't watched the
+01:24 
+
+01:24 video so we can't go into much more
+01:25 
+
+01:25 detail on that until you watch the video
+01:28 
+
+01:28 okay and so you know this person here
+01:31 
+
+01:31 would send it it would look it up and
+01:33 
+
+01:33 send it down
+01:34 
+
+01:34 there so that's just the gist of program
+01:37 
+
+01:37 two someone have a
+01:40 
+
+01:40 question yeah Professor I'm curious
+01:43 
+
+01:43 about the hand are there like
+01:44 
+
+01:44 specifications for the data structure
+01:46 
+
+01:46 that we have to use for the handle table
+01:48 
+
+01:48 or is that just whatever we want to do
+01:50 
+
+01:50 whatever you want to do so some people
+01:51 
+
+01:51 writing it in C++ use a
+01:55 
+
+01:55 hashmap um some people I if you're
+01:58 
+
+01:58 writing it in C I recommend just use a
+01:60 
+
+01:60 flat Malo the Ray and then you know if
+02:03 
+
+02:03 you need to increase its size so if it
+02:05 
+
+02:05 gets filled realloc it um and to a
+02:07 
+
+02:07 bigger size you don't have to shrink it
+02:09 
+
+02:09 never has to be shrunk it just needs to
+02:11 
+
+02:11 grow you can't just make it like 10,000
+02:13 
+
+02:13 big it has to be able to grow we look
+02:15 
+
+02:15 for that capability that it that it's
+02:17 
+
+02:17 Dynamic okay so what you're going to
+02:20 
+
+02:20 have so let's say on the
+02:22 
+
+02:22 server there's two things that can
+02:24 
+
+02:24 happen on the server is a new client can
+02:27 
+
+02:27 start up and when TCP starts up a new a
+02:29 
+
+02:29 new
+02:31 
+
+02:31 thing it's going to connect to the
+02:33 
+
+02:33 server so TC TCP is connection oriented
+02:37 
+
+02:37 and in your code you're going to call
+02:39 
+
+02:39 connect and the server is is going to
+02:43 
+
+02:43 call accept these are two fun these are
+02:45 
+
+02:45 two socket function
+02:46 
+
+02:46 calls okay and so this is the first
+02:50 
+
+02:50 thing a client's going to do has nothing
+02:51 
+
+02:51 to do with you and and the handle or
+02:53 
+
+02:53 anything this is this is the TCP
+02:56 
+
+02:56 thing the TCP connection setup that's
+02:59 
+
+02:59 where the the the the setup is done all
+03:01 
+
+03:01 all of it the setup is done right there
+03:03 
+
+03:03 underneath we'll study that when we get
+03:05 
+
+03:05 to
+03:06 
+
+03:06 TCP okay and
+03:08 
+
+03:08 so you have to your server has to really
+03:11 
+
+03:11 look at two things it has to
+03:15 
+
+03:15 accept new
+03:17 
+
+03:17 clients
+03:19 
+
+03:19 TCP
+03:20 
+
+03:20 clients and it needs to
+03:24 
+
+03:24 process
+03:27 
+
+03:27 incoming
+03:29 
+
+03:29 messages
+03:31 
+
+03:31 right those are the two things that that
+03:33 
+
+03:33 this server functionality is doing it's
+03:34 
+
+03:34 waiting it's saying oh you're trying to
+03:37 
+
+03:37 do a TCP connect to you I'm going to
+03:39 
+
+03:39 call my accept code calls the accept
+03:41 
+
+03:41 code okay great oh now you sent a
+03:45 
+
+03:45 message from test one to test two I got
+03:47 
+
+03:47 to do my process my message code okay
+03:50 
+
+03:50 and then come back and to do that we're
+03:52 
+
+03:52 going to use something called the poll
+03:55 
+
+03:55 function and I provide you a poll
+03:57 
+
+03:57 Library it's it's a library that does
+03:59 
+
+03:59 that you just have to tell it with
+04:01 
+
+04:01 sockets to look at and um with file
+04:04 
+
+04:04 descriptors to look at and it will look
+04:05 
+
+04:05 at those um the videos cover the poll
+04:08 
+
+04:08 function so what what's my suggestion
+04:10 
+
+04:10 watch the video that's what's going to
+04:12 
+
+04:12 allow us to to process one or the other
+04:15 
+
+04:15 you can't make this multi-threaded you
+04:17 
+
+04:17 can't make that you can't Fork up there
+04:19 
+
+04:19 it has to be done using pole in program
+04:22 
+
+04:22 three we'll do multi-threaded so we're
+04:24 
+
+04:24 going to try the there's there's
+04:25 
+
+04:25 multiple techniques for handling
+04:27 
+
+04:27 multiple clients one is via the poll
+04:29 
+
+04:29 function and and another one is
+04:31 
+
+04:31 threading another one is forking just
+04:33 
+
+04:33 depends on what we use threading in
+04:34 
+
+04:34 program three I saw hand up was that was
+04:38 
+
+04:38 that the question oh yeah I just want to
+04:40 
+
+04:40 know if pole was
+04:41 
+
+04:41 asynchronous yes well it's it the way
+04:44 
+
+04:44 you're going to use it it's G to be
+04:46 
+
+04:46 blocking so you're going to call poll
+04:48 
+
+04:48 here and and your server is just going
+04:50 
+
+04:50 to sit there and as soon as a socket
+04:53 
+
+04:53 becomes ready to process you're going to
+04:56 
+
+04:56 do an if statement and send it here or
+04:58 
+
+04:58 you're going to send it here and it's is
+04:60 
+
+04:60 going to finish processing that thing
+05:01 
+
+05:01 then it comes back up to poll and
+05:03 
+
+05:03 processes the next message so if there's
+05:05 
+
+05:05 messages coming in it's constantly busy
+05:07 
+
+05:07 and then as soon as there's nothing
+05:08 
+
+05:08 coming in because everyone's just
+05:09 
+
+05:09 sitting eating lunch right Paul just
+05:11 
+
+05:11 sits there blocking waiting for the next
+05:13 
+
+05:13 thing to come in so so pole has like a
+05:15 
+
+05:15 DAT like a cube that it puts all the
+05:18 
+
+05:18 incoming requests in yes yes and my poll
+05:22 
+
+05:22 library is not it works okay it's the
+05:24 
+
+05:24 first thing it works and it is not
+05:26 
+
+05:26 industry ready uh nope it's not and
+05:30 
+
+05:30 doesn't work on multi-threaded so it
+05:31 
+
+05:31 can't you can't you can't use it on
+05:33 
+
+05:33 multi-threaded it's not multi-threaded
+05:35 
+
+05:35 safe
+05:37 
+
+05:37 um but it works for this program and
+05:39 
+
+05:39 that's all all that we need um anyway so
+05:42 
+
+05:42 you're going to call pole pole will then
+05:45 
+
+05:45 return the next available
+05:47 
+
+05:47 socket in in my code pole returns all
+05:50 
+
+05:50 the sockets my code then picks the the
+05:52 
+
+05:52 lowest one and returns and the problem
+05:54 
+
+05:54 with that is it's always the lowest one
+05:56 
+
+05:56 so if somebody's really active low a low
+05:58 
+
+05:58 socket number and then you're up here in
+05:60 
+
+05:60 a higher socket number you're not going
+06:01 
+
+06:01 to get processed for a while and that's
+06:03 
+
+06:03 not fair it really should go all right
+06:06 
+
+06:06 so watch the video you learn about poll
+06:08 
+
+06:08 and you'll now know what it's for you're
+06:11 
+
+06:11 going to call poll on the client too so
+06:13 
+
+06:13 on the
+06:14 
+
+06:14 client you're also going to use poll and
+06:17 
+
+06:17 there's two things you're looking at one
+06:20 
+
+06:20 is the socket to the
+06:24 
+
+06:24 server that's your connection to the
+06:26 
+
+06:26 server so if the server sends you a
+06:28 
+
+06:28 message you want to know it and process
+06:30 
+
+06:30 it and the other is standard
+06:34 
+
+06:34 in
+06:39 
+
+06:39 I right standard in's a file descriptor
+06:42 
+
+06:42 just like a socket's a file descriptor
+06:44 
+
+06:44 so we'll we'll put both of these in the
+06:47 
+
+06:47 set the user starts typing we'll process
+06:50 
+
+06:50 standard in and get the message and send
+06:51 
+
+06:51 it to the server if the server sends us
+06:54 
+
+06:54 a message we'll grab it and display it
+06:56 
+
+06:56 to the client okay and we can do that
+06:59 
+
+06:59 using p also and the last thing I want
+07:02 
+
+07:02 to show you is something called packet
+07:04 
+
+07:04 flow di well there's two things packet
+07:06 
+
+07:06 flow
+07:10 
+
+07:10 diagrams this is a good way to
+07:13 
+
+07:13 understand the flow of information in
+07:15 
+
+07:15 your program right and
+07:18 
+
+07:18 so I run into these all the time in my
+07:22 
+
+07:22 business not necessar client server but
+07:24 
+
+07:24 the way to exchange information so let's
+07:27 
+
+07:27 say at startup what's the client going
+07:28 
+
+07:28 to do well the client's going to to send
+07:30 
+
+07:30 the
+07:32 
+
+07:32 handle to the server then the server
+07:36 
+
+07:36 which isn't part of the diagram really
+07:37 
+
+07:37 is going to look in the handle
+07:42 
+
+07:42 table to verify that that's a unique
+07:45 
+
+07:45 handle right if there's two people with
+07:46 
+
+07:46 the same name it's going to kick the
+07:48 
+
+07:48 second one out and say you can't use
+07:49 
+
+07:49 that and let's say it's Unique it's
+07:52 
+
+07:52 going to send back an
+07:55 
+
+07:55 okay or it could send the handle name
+07:59 
+
+07:59 over
+08:02 
+
+08:02 and it's going to get uh a reject
+08:05 
+
+08:05 whatever you want to call it a no a not
+08:07 
+
+08:07 okay I'll say not however you want to
+08:10 
+
+08:10 designate
+08:12 
+
+08:12 it right and it would look in the handle
+08:14 
+
+08:14 table there so these are called packet
+08:17 
+
+08:17 flow diagrams this is really the
+08:18 
+
+08:18 simplest flow you can do at happens to
+08:21 
+
+08:21 be the login flow but there are other
+08:23 
+
+08:23 Flows In in the program where drawing
+08:27 
+
+08:27 packet flow diagrams will help you
+08:30 
+
+08:30 because what I recommend you do after
+08:33 
+
+08:33 you do the lab is write the handle table
+08:37 
+
+08:37 whatever you're going to do for your
+08:38 
+
+08:38 handle table study it and write it
+08:40 
+
+08:40 because you don't need the network at
+08:41 
+
+08:41 all you need to be able to look up a
+08:43 
+
+08:43 handle you need to add a handle you need
+08:45 
+
+08:45 to delete a handle you need to be able
+08:47 
+
+08:47 to look up by a socket number and get
+08:49 
+
+08:49 the handle name so you look up by handle
+08:51 
+
+08:51 name get a socket look up by socket get
+08:53 
+
+08:53 the handle name and then add and delete
+08:56 
+
+08:56 so that's a simple interface and you can
+08:58 
+
+08:58 debug that get it work working 100% and
+09:00 
+
+09:00 you never have to mess with it again
+09:02 
+
+09:02 okay write it in separate file test okay
+09:05 
+
+09:05 well once you're done with that then do
+09:08 
+
+09:08 this this is really simple it's the
+09:10 
+
+09:10 first thing you have to do anyways right
+09:12 
+
+09:12 is load entries into your handle table
+09:14 
+
+09:14 so why don't you PR why don't you write
+09:15 
+
+09:15 logging into the system and you write it
+09:18 
+
+09:18 and you debug it and then just a second
+09:22 
+
+09:22 J and then you know go on to percent M
+09:25 
+
+09:25 which is sending a message do your
+09:27 
+
+09:27 packet flows on that what's that going
+09:29 
+
+09:29 to look like
+09:30 
+
+09:30 and then code it all right go ahead
+09:33 
+
+09:33 Joshua well the scale of this assignment
+09:35 
+
+09:35 would just like a linear array of just
+09:38 
+
+09:38 like handle um uh socket be fine just do
+09:43 
+
+09:43 a linear search so so yeah that's fine
+09:46 
+
+09:46 and and I did um you know just a flat
+09:50 
+
+09:50 array of structures right because you
+09:52 
+
+09:52 need a you almost have to have like a
+09:54 
+
+09:54 valid flag to to say that this the value
+09:58 
+
+09:58 here is valid or not
+09:60 
+
+09:60 um is the way I did it and you just have
+10:02 
+
+10:02 to be able to reic so if if it gets
+10:05 
+
+10:05 full then and nice thing is you can then
+10:08 
+
+10:08 just index into it based on socket
+10:10 
+
+10:10 number so when you get a socket number
+10:11 
+
+10:11 you can do it but you do have to do a
+10:13 
+
+10:13 linear search for the handle name some
+10:16 
+
+10:16 people do trees that's more complex than
+10:18 
+
+10:18 you need some people do I mean uh the
+10:20 
+
+10:20 link list don't kill yourself do do a
+10:23 
+
+10:23 flat array with re Alex and you're done
+10:25 
+
+10:25 I seriously this is not a data
+10:27 
+
+10:27 structures class this is networking
+10:30 
+
+10:30 glass I really want you to get the
+10:31 
+
+10:31 networking part working so don't don't
+10:33 
+
+10:33 spend a lot of time on the handle table
+10:35 
+
+10:35 get it right but don't don't be complex
+10:38 
+
+10:38 all right um the other thing is don't
+10:41 
+
+10:41 spend a lot of time on standard in right
+10:44 
+
+10:44 so there's a set of commands assume the
+10:47 
+
+10:47 commands are all typed
+10:49 
+
+10:49 perfectly okay and just process those
+10:53 
+
+10:53 okay not even they don't even wrap
+10:55 
+
+10:55 around they're just perfect 100
+10:57 
+
+10:57 character whatever right and don't worry
+10:59 
+
+10:59 about airor checking on that just get it
+11:01 
+
+11:01 right and because now you can do the
+11:03 
+
+11:03 networking part which is where I want
+11:04 
+
+11:04 you to really spend and then when you're
+11:06 
+
+11:06 all done if you you come back and you
+11:07 
+
+11:07 mess around a little bit with error
+11:08 
+
+11:08 checking on the hand on the on the user
+11:11 
+
+11:11 input okay but I've had students spend
+11:14 
+
+11:14 they just spend you can spend C sucks at
+11:16 
+
+11:16 standard in right I mean it's just
+11:17 
+
+11:17 horrible at doing user input and so you
+11:20 
+
+11:20 could spend you know 20 hours on it and
+11:22 
+
+11:22 still never finish it because c will
+11:24 
+
+11:24 just screw you up some other way so um
+11:27 
+
+11:27 don't spend a lot of time on the
+11:28 
+
+11:28 standard end
+11:30 
+
+11:30 assume the correctly Comm done command
+11:32 
+
+11:32 you lose a few points on some of the
+11:34 
+
+11:34 tests if you don't fix it up at all but
+11:37 
+
+11:37 you'll get most of the points and that's
+11:38 
+
+11:38 the important
+11:39 
+
+11:39 thing okay all right so I talked about
+11:42 
+
+11:42 standard in all right talked about the
+11:44 
+
+11:44 Packa flow diagrams uh I'll give you the
+11:47 
+
+11:47 heads up here if you don't start early
+11:50 
+
+11:50 you will not finish this lab this
+11:52 
+
+11:52 program um I guarantee that and this is
+11:56 
+
+11:56 different than 3 357
+11:60 
+
+11:60 so or even OS because in either of those
+12:02 
+
+12:02 classes how do we do it you know we wait
+12:04 
+
+12:04 till 24 hours before it's due and then
+12:06 
+
+12:06 we start and what we do is we type int
+12:09 
+
+12:09 Main and then we read the spec and then
+12:11 
+
+12:11 we come back and start typing more code
+12:13 
+
+12:13 right that's not going to work here um
+12:17 
+
+12:17 the way I say if if you spend 20 hours
+12:20 
+
+12:20 15 to 20 hours on this program you'll
+12:21 
+
+12:21 get it working without a problem okay if
+12:23 
+
+12:23 you spend 40 hours on this program
+12:25 
+
+12:25 you'll never get it working okay so the
+12:28 
+
+12:28 more time you spend on it the worse it
+12:30 
+
+12:30 gets why because you just it's more
+12:32 
+
+12:32 complicated because you got two machines
+12:34 
+
+12:34 talking to each other if you don't think
+12:36 
+
+12:36 about it in advance let it ferment in
+12:38 
+
+12:38 your brain in advance you will not get
+12:40 
+
+12:40 it to work and so I'm sorry to say that
+12:43 
+
+12:43 some of you are going to come to me you
+12:45 
+
+12:45 know when it's due and say I started too
+12:47 
+
+12:47 late I'm going to say yeah I know I mean
+12:49 
+
+12:49 I know there's nothing I can do about
+12:51 
+
+12:51 that okay so please do start early how
+12:54 
+
+12:54 do I suggest it read the spec today read
+12:57 
+
+12:57 the spec today don't do anything with
+12:59 
+
+12:59 with it just read it underline important
+13:01 
+
+13:01 things and put it aside go about your
+13:03 
+
+13:03 business start working on lab
+13:06 
+
+13:06 three right that that lab read it again
+13:09 
+
+13:09 tomorrow underline start making notes
+13:12 
+
+13:12 okay and start thinking about the packet
+13:14 
+
+13:14 flows that you need to do and what's the
+13:16 
+
+13:16 first one you want to implement don't
+13:18 
+
+13:18 write any code finish lab three now
+13:21 
+
+13:21 we're ready to do the now we're ready to
+13:23 
+
+13:23 write the handle table and then we're
+13:25 
+
+13:25 ready to do the login flow right and
+13:28 
+
+13:28 it's just just write like like that get
+13:30 
+
+13:30 the login flow
+13:31 
+
+13:31 working put it aside now you can do the
+13:33 
+
+13:33 percent M put it aside and if you got
+13:36 
+
+13:36 your handle table working all this is
+13:37 
+
+13:37 much simpler if your handle table is not
+13:39 
+
+13:39 working then you're screwed right so
+13:41 
+
+13:41 that's why write your hand all right so
+13:44 
+
+13:44 don't listen to anything I said and just
+13:45 
+
+13:45 go ahead and do it however you want um
+13:47 
+
+13:47 feel free I've never this is the first
+13:49 
+
+13:49 time I've ever given this assignment not
+13:50 
+
+13:50 true and um I've given it a bunch of
+13:53 
+
+13:53 times and I've given a bunch of zeros
+13:55 
+
+13:55 unfortunately um when I think you can do
+13:57 
+
+13:57 it okay all right the last thing I want
+14:00 
+
+14:00 to talk about is
+14:03 
+
+14:03 lab in lab three you're going to write
+14:05 
+
+14:05 two functions one's send
+14:08 
+
+14:08 pdu and one's receive
+14:12 
+
+14:12 pdu so in our
+14:14 
+
+14:14 program we're going to create an
+14:16 
+
+14:16 application
+14:20 
+
+14:20 pdu all right so here's our application
+14:24 
+
+14:24 pdu and we're going to have an
+14:26 
+
+14:26 application
+14:28 
+
+14:28 header
+14:30 
+
+14:30 this is defined in the spec you have to
+14:32 
+
+14:32 follow my header spec because we are
+14:34 
+
+14:34 going to run programs against your
+14:36 
+
+14:36 program that expect this header if your
+14:38 
+
+14:38 header isn't the right header our
+14:40 
+
+14:40 program is going to break immediately
+14:42 
+
+14:42 and then we can't test it you lose right
+14:44 
+
+14:44 I mean we can't we can't test and so
+14:47 
+
+14:47 you're going to have the application
+14:48 
+
+14:48 header and then you're going to have the
+14:50 
+
+14:50 payload and that's the message you're
+14:52 
+
+14:52 sending hello how are you or whatever it
+14:54 
+
+14:54 is right the application header has the
+14:56 
+
+14:56 handle names in it the type of message
+14:58 
+
+14:58 it is things like
+14:60 
+
+14:60 that and then the application header the
+15:03 
+
+15:03 first two
+15:06 
+
+15:06 bytes is what the lab is about the first
+15:09 
+
+15:09 two bytes are the length of the
+15:13 
+
+15:13 pdu that's what's in
+15:16 
+
+15:16 there and you're going to get the data
+15:20 
+
+15:20 you're going to mem copy it into a
+15:22 
+
+15:22 structure into a buffer put two bites on
+15:25 
+
+15:25 the front of it and send the whole
+15:27 
+
+15:27 thing okay one send and then on the
+15:30 
+
+15:30 other side you're going to do two
+15:32 
+
+15:32 receives and you want to know why you're
+15:34 
+
+15:34 going to watch the
+15:35 
+
+15:35 video right CU I tell you in the video
+15:37 
+
+15:37 why you have to do that so uh anyways so
+15:41 
+
+15:41 the video uh is your next place to go
+15:43 
+
+15:43 but what I want to make sure you know is
+15:46 
+
+15:46 TCP and IP are out
+15:50 
+
+15:50 here you're not going to see these right
+15:54 
+
+15:54 this is all in the
+15:56 
+
+15:56 kernel right you're going to see this
+15:58 
+
+15:58 this is what you're creating you're
+15:60 
+
+15:60 creating an application Level pdu and
+16:02 
+
+16:02 then you're going to pass it to the
+16:04 
+
+16:04 kernel and the kernel is going to do its
+16:06 
+
+16:06 happy deal which is create a TCP pdu
+16:08 
+
+16:08 called a segment and create an IP pdu
+16:11 
+
+16:11 called the datagram and then create an
+16:13 
+
+16:13 Ethernet frame right and send it
+16:18 
+
+16:18 up all
+16:20 
+
+16:20 right any questions on any I know I went
+16:22 
+
+16:22 over it fast um but it really once you
+16:26 
+
+16:26 watch the videos then uh this will make
+16:28 
+
+16:28 a little more sense and we can talk
+16:30 
+
+16:30 about it again on
+16:32 
+
+16:32 Thursday okay oh and so you're all these
+16:35 
+
+16:35 functions do is they take this here and
+16:39 
+
+16:39 they put that on there the two bytes and
+16:42 
+
+16:42 then they receive it and take those two
+16:44 
+
+16:44 bites off that's all that function
+16:47 
+
+16:47 does watch the
+16:50 
+
+16:50 videos all
+16:57 
+
+16:57 right
