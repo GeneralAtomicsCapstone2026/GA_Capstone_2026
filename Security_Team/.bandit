@@ -1,0 +1,2 @@
+[bandit]
+exclude = ./.venv,./Reference_464
