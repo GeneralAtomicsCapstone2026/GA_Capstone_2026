@@ -101,7 +101,7 @@ jobs:
           path: Security_Team/bandit-report.json
           if-no-files-found: error
 
-    secrets:
+  secrets:
     name: Secret scan
     runs-on: ubuntu-24.04
     timeout-minutes: 10
