@@ -101,13 +101,12 @@ jobs:
           path: Security_Team/bandit-report.json
           if-no-files-found: error
 
-  secrets:
+    secrets:
     name: Secret scan
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: read
 
     steps:
       - name: Check out repository
@@ -117,12 +116,11 @@ jobs:
           persist-credentials: false
 
       - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_VERSION: "8.24.2"
-          GITLEAKS_ENABLE_COMMENTS: "false"
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks:v8.24.2 \
+            git /repo --redact
 
   sca:
     name: Dependency scan
