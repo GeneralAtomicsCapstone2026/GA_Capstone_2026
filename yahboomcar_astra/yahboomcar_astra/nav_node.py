@@ -8,6 +8,7 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String, Int32
 from std_msgs.msg import StringArray
 from dataclasses import dataclass
+from airport_interfaces.msg import DetectedObjectsList
 
 
 @dataclass
@@ -47,10 +48,10 @@ class NavNode(Node):
         )
 
         self.sub_to_CV = self.create_subscription(
-            StringArray,
-            "ANOTHA TOPIC",
-            self.CV_callback,
-            10
+            DetectedObjectsList,
+            "/detected_objects",
+            self.detection_callback,
+            10,
         )
 
         self.sub_to_line_follow = self.create_subscription(
@@ -76,7 +77,17 @@ class NavNode(Node):
         self.next_sign = self.instructions[0]
 
     def CV_callback(self, msg):
-        self.available_signs = list(msg.data)
+        for detection in msg.objects:
+            class_name = detection.class_name
+            confidence = detection.confidence
+
+            x = detection.x_center
+            y = detection.y_center
+            width = detection.width
+            height = detection.height
+
+            self.get_logger().info(f"Detected: {class_name}, confidence: {confidence:.2f}"
+            )
 
     def line_follow_callback(self, msg):
         self.options = list(msg.data)
