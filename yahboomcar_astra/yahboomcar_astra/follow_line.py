@@ -147,6 +147,12 @@ class LineDetect(Node):
 		ret, frame = self.capture.read()
 		action = cv.waitKey(10) & 0xFF
 		frame, binary =self.process(frame, action)
+		# Save the grayscale output when p is pressed
+		if action == ord('p') and len(binary) != 0:
+			stamp = time.strftime("%Y%m%d_%H%M%S")
+			cv.imwrite(f"/tmp/binary_{stamp}.png", binary)
+			print(f"Saved /tmp/binary_{stamp}.png")
+
 		start = time.time()
 		fps = 1 / (start - self.end)
 		text = "FPS : " + str(int(fps))

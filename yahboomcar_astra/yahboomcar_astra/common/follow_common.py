@@ -16,13 +16,17 @@ class LineCentroid(NamedTuple):
 LINE_FOLLOW_TOP_CROP_FRACTION = 0.2
 # Fractions of the image height (from the top) at which a 1D row of pixels is sampled
 # from the binary image.
-# DETECT row: farther from the camera; used to spot upcoming turn options (forks/intersections).
+# DETECT row: farther from the camera; used to spot upcoming turn options (forks/intersections)
 DETECT_LINE_SAMPLE_ROW_FRACTION = 0.4
-# ACT row: closer to the camera; used for the line we actually steer on (low latency).
+# ACT row: closer to the camera; used for the line we actually steer on (low latency)
 ACT_LINE_SAMPLE_ROW_FRACTION = 0.7
+# Sample a band of pixels instead of a row, to handle pixel noise
+LINE_SAMPLE_BAND_HEIGHT = 10
+# A column of the band counts as "line" if at least this fraction of its pixels are lit
+LINE_SAMPLE_BAND_CONFIDENCE = 0.5
 # blobs of this size and larger are considered significant
-GAP_THRESH = 4
-LINE_THRESH = 4
+GAP_THRESH = 5
+LINE_THRESH = 5
 
 def write_HSV(wf_path, value):
     with open(wf_path, "w") as wf:
@@ -111,6 +115,20 @@ class color_follow:
         self.detect_lines = []
         self.act_lines = []
 
+    def collapse_band(self, binary, center_y):
+        """Collapse a horizontal band of the binary image into a 1D 0/1 row.
+
+        The band is LINE_SAMPLE_BAND_HEIGHT rows tall, centered on center_y (clamped to the
+        image). A column is 1 if at least LINE_SAMPLE_BAND_CONFIDENCE of the band's pixels
+        in that column are lit.
+        """
+        img_h = binary.shape[0]
+        band_h = min(LINE_SAMPLE_BAND_HEIGHT, img_h)
+        top = max(0, min(center_y - band_h // 2, img_h - band_h))
+        band = binary[top:top + band_h] > 0
+        min_count = int(np.ceil(LINE_SAMPLE_BAND_CONFIDENCE * band_h))
+        return (band.sum(axis=0) >= min_count).astype(np.uint8)
+
     def detect_diverged_lines(self, px_arr):
         arr = np.array(px_arr)
         arr[arr > 0] = 1
@@ -162,11 +180,12 @@ class color_follow:
         gray_img = cv.morphologyEx(gray_img, cv.MORPH_CLOSE, kernel)
         # Image binarization operation
         ret, binary = cv.threshold(gray_img, 10, 255, cv.THRESH_BINARY)
-        # Sample two 1D horizontal rows of the binary image and detect the lines in each
+        # Sample two horizontal bands of the binary image, collapse each to a 1D row,
+        # and detect the lines in each
         detect_y = int(height * DETECT_LINE_SAMPLE_ROW_FRACTION)
         act_y = int(height * ACT_LINE_SAMPLE_ROW_FRACTION)
-        self.detect_lines = self.detect_diverged_lines(binary[detect_y])
-        self.act_lines = self.detect_diverged_lines(binary[act_y])
+        self.detect_lines = self.detect_diverged_lines(self.collapse_band(binary, detect_y))
+        self.act_lines = self.detect_diverged_lines(self.collapse_band(binary, act_y))
         # Get the set of contour points (coordinates)
         find_contours = cv.findContours(binary, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
         if len(find_contours) == 3: contours = find_contours[1]

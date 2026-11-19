@@ -25,6 +25,6 @@ certs*/
 a.out
 *.bak
 
-
+.vscode/
 .venv/
 .ruff_cache/
