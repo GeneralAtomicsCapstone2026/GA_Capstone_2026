@@ -10,6 +10,10 @@ find_package(std_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DetectedObject.msg"
   "msg/DetectedObjectsList.msg"
+  "msg/Direction.msg"
+  "msg/DirectionOptions.msg"
+  "msg/TowerInstruction.msg"
+  "msg/TowerInstructions.msg"
   DEPENDENCIES std_msgs
 )
 
