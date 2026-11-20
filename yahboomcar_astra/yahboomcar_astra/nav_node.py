@@ -6,22 +6,26 @@ import math
 from enum import Enum, auto
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String, Int32
-from std_msgs.msg import StringArray
 from dataclasses import dataclass
-from airport_interfaces.msg import DetectedObjectsList
+from airport_interfaces.msg import DetectedObjectsList, Direction, DirectionOptions, TowerInstructions, TowerInstruction
+
 
 
 @dataclass
 class Sign:
     sign_type: str
     sign_label: str
-    sign_direction: str
+    sign_direction: str | None
 
     @classmethod
     def from_string(cls, name_string):
-        sign_type, sign_label, sign_direction = (
-            name_string.lower().split("_", 2)
-        )
+        parts = name_string.lower().split("_", 2)
+
+        try:
+            sign_type, sign_label, sign_direction = parts
+        except ValueError:
+            sign_type, sign_label = parts
+            sign_direction = None
 
         return cls(
             sign_type=sign_type,
@@ -40,91 +44,130 @@ class NavNode(Node):
         self.next_sign = None
 
 
-        self.sub_to_tower = self.create_subscription(
-            StringArray,
-            'InstructionTopic',
-            self.tower_callback,
-            10
-        )
+        # self.sub_to_tower = self.create_subscription(  #sends a list of tuples [(taxiway A, LEFT), (taxiway B, RIGHT)]
+        #     TowerInstructions,
+        #     'InstructionTopic',
+        #     self.tower_callback,
+        #     10
+        # )
 
         self.sub_to_CV = self.create_subscription(
             DetectedObjectsList,
             "/detected_objects",
-            self.detection_callback,
+            self.CV_callback,
             10,
         )
 
         self.sub_to_line_follow = self.create_subscription(
-            StringArray,
+            DirectionOptions,
             "/turn_options",
             self.line_follow_callback,
             10
         )
 
         self.line_follow_instructions = self.create_publisher(
-            String,
-            'DIRECTION TOPIC',
+            Direction,
+            '/turn_decision',
             10
             )
 
-        self.create_timer(0.1, self.BDT)  #timer to make FSM run this often
 
       
     #This is literally to grab the instructions from the tower and put them into a global var
-    def tower_callback(self, msg):
-        self.instructions_raw = list(msg.data) #list() is used so that this file has a separate copy to change however
-        self.instructions = [Sign.from_string(instruction) for instruction in self.instructions_raw]
-        self.next_sign = self.instructions[0]
+    # def tower_callback(self, msg):
+    #     self.instructions_raw = list(msg.data) #list() is used so that this file has a separate copy to change however
+    #     self.instructions = [Sign.from_string(instruction) for instruction in self.instructions_raw]
+    #     self.next_sign = self.instructions[0]
 
     def CV_callback(self, msg):
+        # Start with an empty list for this set of detections.
+        detected_signs = []
+
         for detection in msg.objects:
             class_name = detection.class_name
             confidence = detection.confidence
 
-            x = detection.x_center
-            y = detection.y_center
-            width = detection.width
-            height = detection.height
-
-            self.get_logger().info(f"Detected: {class_name}, confidence: {confidence:.2f}"
+            self.get_logger().info(
+                f"Detected: {class_name}, confidence: {confidence:.2f}"
             )
 
+            detected_signs.append(class_name)
+
+        # Replace the old detections with the newest ones.
+        self.available_signs = detected_signs
+
+
     def line_follow_callback(self, msg):
-        self.options = list(msg.data)
+        # Each item in msg.directions is a Direction message.
+        # Store the numeric direction from each one.
+        self.options = [
+            option.direction for option in msg.directions
+        ]
+
+        self.BDT()
 
     def BDT(self):
-        direction_msg = String()
-
+        # Without an instruction, there is no target sign to look for.
         if not self.instructions:
             return
 
-        available_sign_objects = [Sign.from_string(sign) for sign in self.available_signs]
-        available_turn_options = [option.lower() for option in self.options]
-            
-        #TODO: Implement stop logic after we design stopping signs etc
+        direction_msg = Direction()
 
-        target_sign_is_visible = False
+        # Default to straight until a matching sign and turn are found.
+        direction_msg.direction = Direction.STRAIGHT
 
-        for available_sign in available_sign_objects:
-            if (available_sign.sign_type == self.next_sign.sign_type
-                    and available_sign.sign_label == self.next_sign.sign_label):
-                target_sign_is_visible = True
-                break 
+        # Example: ("taxiway_a", Direction.LEFT)
+        target_sign_name, tower_direction = self.instructions[0]
 
-        if not target_sign_is_visible:
-            direction_msg.data = "straight"
+        target_sign = Sign.from_string(target_sign_name)
 
-        elif self.next_sign.sign_direction in available_turn_options:
-            direction_msg.data = self.next_sign.sign_direction
-            self.instructions.pop(0)
-            if self.instructions:
-                self.next_sign = self.instructions[0]
-            else:
-                self.next_sign = None
+        # Convert the directions in sign names into numeric values.
+        sign_direction_values = {
+            "left": Direction.LEFT,
+            "right": Direction.RIGHT,
+            "straight": Direction.STRAIGHT,
+        }
 
-        else:
-            direction_msg.data = "straight"
+        for sign_name in self.available_signs:
+            available_sign = Sign.from_string(sign_name)
+
+            # Is this the sign the tower wants us to find?
+            if (available_sign.sign_type == target_sign.sign_type and available_sign.sign_label == target_sign.sign_label):
+                # Prefer the tower direction if one was provided.
+                if tower_direction is not None:
+                    chosen_direction = tower_direction
+                else:
+                    # The sign direction is a string, so convert it.
+                    # Returns None if it is missing or unrecognized.
+                    chosen_direction = sign_direction_values.get(available_sign.sign_direction)
+
+                # Only use the direction if line following reports
+                # that it is available at the intersection.
+                if (chosen_direction is not None and chosen_direction in self.options):
+                    direction_msg.direction = chosen_direction                    
+                    self.instructions.pop(0)  # Remove the completed instruction.
+
+                break
 
         self.line_follow_instructions.publish(direction_msg)
+
+
+
+def main(args=None):
+    rclpy.init(args=args)
+
+    node = NavNode()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
 
                 
