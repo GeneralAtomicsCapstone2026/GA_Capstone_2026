@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+import math
 import time
 import cv2 as cv
 import numpy as np
@@ -8,25 +9,74 @@ from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist
 
 class LineCentroid(NamedTuple):
-  center: int
-  width: int
+  width: int      # in samples (~px along the arc, px for a row)
+  x: int          # center pixel of the line, image coordinates
+  y: int
+  heading: float  # radians from straight ahead, seen from the car (bottom-middle of the frame).
+                  # + is left, - is right
 
+# Frame size after resizing, used for precomputed arc pixel maps
+FRAME_WIDTH = 640
+FRAME_HEIGHT = 480
 # Fraction of the image height (from the top) that is blacked out before line detection.
 # 0.0 = use the whole frame, 0.5 = ignore the top half, 1.0 = ignore everything.
 LINE_FOLLOW_TOP_CROP_FRACTION = 0.2
-# Fractions of the image height (from the top) at which a 1D row of pixels is sampled
-# from the binary image.
-# DETECT row: farther from the camera; used to spot upcoming turn options (forks/intersections)
-DETECT_LINE_SAMPLE_ROW_FRACTION = 0.4
-# ACT row: closer to the camera; used for the line we actually steer on (low latency)
-ACT_LINE_SAMPLE_ROW_FRACTION = 0.7
-# Sample a band of pixels instead of a row, to handle pixel noise
+# Sample a linear band of pixels of this thickness
 LINE_SAMPLE_BAND_HEIGHT = 10
-# A column of the band counts as "line" if at least this fraction of its pixels are lit
-LINE_SAMPLE_BAND_CONFIDENCE = 0.5
+# A column of the sampled band (linear or radial) counts as "line"
+# if at least this fraction of its pixels are lit
+SAMPLE_BAND_CONFIDENCE = 0.5
 # blobs of this size and larger are considered significant
 GAP_THRESH = 5
 LINE_THRESH = 5
+# Sample a radial band of pixels at this radius
+ARC_SAMPLE_RADIUS = 275
+# Band thickness in px, centered on the above radius
+ARC_SAMPLE_THICKNESS = 9
+
+def find_lines(px_arr):
+    """Find the lines (runs of 1s) in a 1D 0/1 array.
+
+    Gaps narrower than GAP_THRESH are bridged first, then lines narrower than
+    LINE_THRESH are dropped. Returns a list of (start, end) index pairs, end exclusive.
+    """
+    # int8 so np.diff gives -1 at line ends (uint8 would wrap to 255)
+    arr = (np.asarray(px_arr) > 0).astype(np.int8)
+    diff_arr = np.diff(np.pad(arr, 1))
+    # start and stop indices of LINES, not GAPS
+    starts = np.flatnonzero(diff_arr == 1).tolist()
+    ends = np.flatnonzero(diff_arr == -1).tolist()
+
+    # REMOVE INSIGNIFICANT GAPS
+    # iterate in reverse to avoid indexing issues when deleting
+    for i in range(len(starts) - 2, -1, -1):
+        if starts[i+1] - ends[i] < GAP_THRESH:
+            del starts[i+1]
+            del ends[i]
+
+    # REMOVE INSIGNIFICANT LINES
+    return [(start, end) for start, end in zip(starts, ends) if end - start >= LINE_THRESH]
+
+
+def heading_to(x, y, origin_x, origin_y):
+    """Angle from straight ahead (image up) to point (x, y), seen from the origin.
+    Radians, + = left, - = right."""
+    return math.atan2(origin_x - x, origin_y - y)
+
+
+def build_arc_maps(width, height, radius, thickness):
+    """Precompute the cv.remap maps for the arc band.
+
+    Returns (map_x, map_y, theta): float32 maps of shape (thickness, samples), and the
+    angle of each sample (pi = left ... 0 = right).
+    """
+    cx, cy = width / 2, height - 1
+    n_samples = int(round(np.pi * radius))
+    theta = np.linspace(np.pi, 0, n_samples)
+    radii = radius - thickness // 2 + np.arange(thickness)
+    map_x = (cx + radii[:, None] * np.cos(theta)).astype(np.float32)
+    map_y = (cy - radii[:, None] * np.sin(theta)).astype(np.float32)
+    return map_x, map_y, theta
 
 def write_HSV(wf_path, value):
     with open(wf_path, "w") as wf:
@@ -104,7 +154,8 @@ def ManyImgs(scale, imgarray):
 
 
 class color_follow:
-    def __init__(self):
+    def __init__(self, arc_radius=ARC_SAMPLE_RADIUS, arc_thickness=ARC_SAMPLE_THICKNESS,
+                 frame_size=(FRAME_WIDTH, FRAME_HEIGHT)):
         '''
 	    Initialize some parameters
         '''
@@ -112,12 +163,56 @@ class color_follow:
         self.Center_x = 0
         self.Center_y = 0
         self.Center_r = 0
-        self.detect_lines = []
-        self.act_lines = []
+        self.arc_lines = []
+        self.arc_radius = arc_radius
+        self.arc_thickness = arc_thickness
+        # Precompute the arc remap maps once instead of per frame
+        self.init_arc_maps(*frame_size)
+
+    def init_arc_maps(self, width, height):
+        self.arc_frame_shape = (height, width)
+        self.arc_map_x, self.arc_map_y, self.arc_theta = build_arc_maps(
+            width, height, self.arc_radius, self.arc_thickness)
+
+    def sample_arc(self, binary):
+        """Sample the arc band of the binary image and return the lines crossing it.
+        """
+        if binary.shape[:2] != self.arc_frame_shape:
+            # Only happens if the frame size changes (process() always resizes to 640x480)
+            self.init_arc_maps(binary.shape[1], binary.shape[0])
+        # Translates radial band (arc) into a linear band that numpy can use easily
+        band = cv.remap(binary, self.arc_map_x, self.arc_map_y, cv.INTER_NEAREST,
+                        borderMode=cv.BORDER_CONSTANT, borderValue=0)
+        # Only consider arc pixels whose column is more than 50% lit - reduces noise 
+        arc = ((band > 0).mean(axis=0) >= SAMPLE_BAND_CONFIDENCE).astype(np.uint8)
+
+        img_h, img_w = self.arc_frame_shape
+        cx, cy = img_w / 2, img_h - 1
+        lines = []
+        for start, end in find_lines(arc):
+            theta = 0.5 * (self.arc_theta[start] + self.arc_theta[end - 1])
+            x = cx + self.arc_radius * math.cos(theta)
+            y = cy - self.arc_radius * math.sin(theta)
+            lines.append(LineCentroid(end - start, int(round(x)), int(round(y)),
+                                      heading_to(x, y, cx, cy)))
+        return lines
+
+    def sample_row(self, binary, center_y):
+        """Sample a horizontal band of the binary image and return the lines crossing it.
+
+        Does not modify binary. Lines are ordered left to right; indices are columns.
+        """
+        img_h, img_w = binary.shape[:2]
+        cx, cy = img_w / 2, img_h - 1
+        lines = []
+        for start, end in find_lines(self.collapse_band(binary, center_y)):
+            x = 0.5 * (start + end - 1)
+            lines.append(LineCentroid(end - start, int(round(x)), int(center_y),
+                                      heading_to(x, center_y, cx, cy)))
+        return lines
 
     def collapse_band(self, binary, center_y):
         """Collapse a horizontal band of the binary image into a 1D 0/1 row.
-
         The band is LINE_SAMPLE_BAND_HEIGHT rows tall, centered on center_y (clamped to the
         image). A column is 1 if at least LINE_SAMPLE_BAND_CONFIDENCE of the band's pixels
         in that column are lit.
@@ -126,40 +221,8 @@ class color_follow:
         band_h = min(LINE_SAMPLE_BAND_HEIGHT, img_h)
         top = max(0, min(center_y - band_h // 2, img_h - band_h))
         band = binary[top:top + band_h] > 0
-        min_count = int(np.ceil(LINE_SAMPLE_BAND_CONFIDENCE * band_h))
+        min_count = int(np.ceil(SAMPLE_BAND_CONFIDENCE * band_h))
         return (band.sum(axis=0) >= min_count).astype(np.uint8)
-
-    def detect_diverged_lines(self, px_arr):
-        arr = np.array(px_arr)
-        arr[arr > 0] = 1
-        pad_arr = np.pad(arr, 1)
-        diff_arr = np.diff(pad_arr)
-        transitionIndices = np.flatnonzero(diff_arr)
-        # start and stop indices of LINES, not GAPS
-        startIdxs = transitionIndices[0::2]
-        stopIdxs = transitionIndices[1::2]
-
-        # REMOVE INSIGNIFICANT GAPS
-        # iterate in reverse to avoid indexing issues when deleting from arr
-        for i in range(len(startIdxs) - 2, -1, -1):
-            gap_len = startIdxs[i+1] - stopIdxs[i]
-            # remove insignificant gaps
-            if gap_len < GAP_THRESH:
-                startIdxs = np.delete(startIdxs, i+1)
-                stopIdxs = np.delete(stopIdxs, i)
-
-        # REMOVE INSIGNIFICANT LINES
-        for i in range(len(startIdxs) - 1, -1, -1):
-            line_len = stopIdxs[i] - startIdxs[i]
-            if line_len < LINE_THRESH:
-                startIdxs = np.delete(startIdxs, i)
-                stopIdxs = np.delete(stopIdxs, i)
-        lines = []
-        for i in range(len(startIdxs)):
-            width = stopIdxs[i] - startIdxs[i]
-            center = (width // 2) + startIdxs[i]
-            lines.append(LineCentroid(int(center), int(width)))
-        return lines
 
     def line_follow(self, rgb_img, hsv_msg):
         height, width = rgb_img.shape[:2]
@@ -180,12 +243,9 @@ class color_follow:
         gray_img = cv.morphologyEx(gray_img, cv.MORPH_CLOSE, kernel)
         # Image binarization operation
         ret, binary = cv.threshold(gray_img, 10, 255, cv.THRESH_BINARY)
-        # Sample two horizontal bands of the binary image, collapse each to a 1D row,
-        # and detect the lines in each
-        detect_y = int(height * DETECT_LINE_SAMPLE_ROW_FRACTION)
-        act_y = int(height * ACT_LINE_SAMPLE_ROW_FRACTION)
-        self.detect_lines = self.detect_diverged_lines(self.collapse_band(binary, detect_y))
-        self.act_lines = self.detect_diverged_lines(self.collapse_band(binary, act_y))
+        # Sample one arc band around the car and detect the lines crossing it
+        # (more than one line = fork/divergence)
+        self.arc_lines = self.sample_arc(binary)
         # Get the set of contour points (coordinates)
         find_contours = cv.findContours(binary, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
         if len(find_contours) == 3: contours = find_contours[1]
@@ -210,37 +270,29 @@ class color_follow:
             self.Center_x = 0
             self.Center_y = 0
             self.Center_r = 0
-        return rgb_img, binary, (self.Center_x, self.Center_y, self.Center_r), self.detect_lines, self.act_lines
+        return rgb_img, binary, (self.Center_x, self.Center_y, self.Center_r), self.arc_lines
 
     def Roi_hsv(self, img, Roi):
         '''
-        Get the range of HSV in a certain area获取某一区域的HSV的范围
-        :param img: 彩色图
+        Get the range of HSV in a certain area
+        :param img:
         :param Roi:  (x_min, y_min, x_max, y_max)
         Roi=(290,280,350,340)
-        :return: The range of images and HSV such as:(0,0,90)(177,40,150) 图像和HSV的范围 例如：(0,0,90)(177,40,150)
+        :return: The range of images and HSV such as:(0,0,90)(177,40,150)
         '''
         H = [];S = [];V = []
-        # img = cv.resize(img, (640, 480), )
-        # 将彩色图转成HSV
-        # Convert color image to HSV
         HSV = cv.cvtColor(img, cv.COLOR_BGR2HSV)
-        # 画矩形框
-        # Draw a rectangular frame
-        # cv.rectangle(img, (Roi[0], Roi[1]), (Roi[2], Roi[3]), (0, 255, 0), 2)
-        # 依次取出每行每列的H,S,V值放入容器中
+
         # Take out the H, S, V values of each row and each column in turn and put them into the container
         for i in range(Roi[0], Roi[2]):
             for j in range(Roi[1], Roi[3]):
                 H.append(HSV[j, i][0])
                 S.append(HSV[j, i][1])
                 V.append(HSV[j, i][2])
-        # 分别计算出H,S,V的最大最小
         # Calculate the maximum and minimum of H, S, and V respectively
         H_min = min(H); H_max = max(H)
         S_min = min(S); S_max = 253
         V_min = min(V); V_max = 255
-        # HSV范围调整
         # HSV range adjustment
         if H_max + 5 > 255: H_max = 255
         else: H_max += 5

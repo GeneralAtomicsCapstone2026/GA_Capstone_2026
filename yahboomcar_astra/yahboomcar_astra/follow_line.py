@@ -130,9 +130,9 @@ class LineDetect(Node):
 		if self.Track_state == 'init' and self.is_dragging == True:
 			rgb_img = self.select_color_roi(rgb_img)
 		if self.Track_state != 'init' and len(self.hsv_range) != 0:
-			rgb_img, binary, self.circle, detect_lines, act_lines = self.color.line_follow(rgb_img, self.hsv_range)
+			rgb_img, binary, self.circle, arc_lines = self.color.line_follow(rgb_img, self.hsv_range)
 			msg = String()
-			msg.data = f"Detected lines: {detect_lines} | Acting on lines: {act_lines}"
+			msg.data = f"Arc lines: {len(arc_lines)}"
 			self.pub_turnOptions.publish(msg)
 			if self.new_color_selected:
 				self.save_color_params()
